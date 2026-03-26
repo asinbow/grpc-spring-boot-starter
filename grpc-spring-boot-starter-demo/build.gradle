@@ -1,7 +1,7 @@
 import org.lognet.springboot.grpc.gradle.ReactiveFeature
 
 buildscript {
-    ext.kotlin_version = '1.9.10'
+    ext.kotlin_version = '2.1.21'
     repositories {
         mavenCentral()
     }
@@ -89,7 +89,7 @@ dependencies {
     implementation project(':grpc-spring-boot-starter')
     implementation project(':grpc-client-spring-boot-starter')
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-aop:4.0.0-M2'
+    testImplementation 'org.springframework.boot:spring-boot-starter-aspectj'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'com.github.stefanbirkner:system-rules:1.18.0'
     testImplementation('org.springframework.cloud:spring-cloud-starter-consul-discovery')
