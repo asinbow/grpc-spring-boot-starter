@@ -4,8 +4,8 @@ import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.TypeRef;
-import com.jayway.jsonpath.spi.json.GsonJsonProvider;
-import com.jayway.jsonpath.spi.mapper.GsonMappingProvider;
+import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
+import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import org.awaitility.Awaitility;
 import org.hamcrest.Matchers;
@@ -70,8 +70,8 @@ public class ActuatorTest extends GrpcServerTestBase {
         ResponseEntity<String> response = restTemplate.getForEntity("/actuator/grpc", String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         final DocumentContext json = JsonPath.parse(response.getBody(), Configuration.builder()
-                .mappingProvider(new GsonMappingProvider())
-                .jsonProvider(new GsonJsonProvider())
+                .mappingProvider(new JacksonMappingProvider())
+                .jsonProvider(new JacksonJsonProvider())
                 .build());
         final String[] statuses = json.read("services.*name", new TypeRef<String[]>() {});
         assertThat(statuses,Matchers.arrayWithSize(Matchers.greaterThan(0)));
@@ -89,8 +89,8 @@ public class ActuatorTest extends GrpcServerTestBase {
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
         final DocumentContext json = JsonPath.parse(response.getBody(), Configuration.builder()
-                        .mappingProvider(new GsonMappingProvider())
-                        .jsonProvider(new GsonJsonProvider())
+                        .mappingProvider(new JacksonMappingProvider())
+                        .jsonProvider(new JacksonJsonProvider())
                 .build());
         final TypeRef<Set<String>> setOfString = new TypeRef<Set<String>>() {
         };
