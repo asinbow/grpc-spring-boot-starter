@@ -16,13 +16,13 @@ import org.lognet.springboot.grpc.TestConfig;
 import org.lognet.springboot.grpc.demo.DemoApp;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.health.contributor.Status;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -49,34 +49,29 @@ import static org.springframework.boot.test.context.SpringBootTest.WebEnvironmen
         , "spring.main.web-application-type=servlet"
 })
 @ActiveProfiles({"disable-security", "measure"})
+@AutoConfigureTestRestTemplate
 public class ActuatorTest extends GrpcServerTestBase {
 
     @Autowired
     private PrometheusConfig prometheusConfig;
 
-    @LocalServerPort
-    private int localServerPort;
-
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private TestRestTemplate restTemplate;
 
     private final Configuration jsonPathConfig = Configuration.builder()
             .jsonProvider(new GsonJsonProvider())
             .mappingProvider(new GsonMappingProvider())
             .build();
 
-    private String url(String path) {
-        return "http://localhost:" + localServerPort + path;
-    }
-
     @Test
     public void actuatorEnvTest() throws ExecutionException, InterruptedException {
-        ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/env"), String.class);
+        ResponseEntity<String> response = restTemplate.getForEntity("/actuator/env", String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
     }
 
     @Test
     public void actuatorGrpcTest() throws ExecutionException, InterruptedException {
-        ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/grpc"), String.class);
+        ResponseEntity<String> response = restTemplate.getForEntity("/actuator/grpc", String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
         final DocumentContext json = JsonPath.parse(response.getBody(), jsonPathConfig);
@@ -92,7 +87,7 @@ public class ActuatorTest extends GrpcServerTestBase {
 
     @Test
     public void actuatorHealthTest() throws ExecutionException, InterruptedException {
-        ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/health/grpc"), String.class);
+        ResponseEntity<String> response = restTemplate.getForEntity("/actuator/health/grpc", String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
         final DocumentContext json = JsonPath.parse(response.getBody(), jsonPathConfig);
@@ -107,7 +102,7 @@ public class ActuatorTest extends GrpcServerTestBase {
     @Override
     protected void afterGreeting() throws Exception {
 
-        ResponseEntity<ObjectNode> metricsResponse = restTemplate.getForEntity(url("/actuator/metrics"), ObjectNode.class);
+        ResponseEntity<ObjectNode> metricsResponse = restTemplate.getForEntity("/actuator/metrics", ObjectNode.class);
         assertEquals(HttpStatus.OK, metricsResponse.getStatusCode());
         final String metricName = "grpc.server.calls";
         final Optional<String> containsGrpcServerCallsMetric = metricsResponse.getBody().withArray("names")
@@ -118,7 +113,7 @@ public class ActuatorTest extends GrpcServerTestBase {
         assertThat("Should contain " + metricName, containsGrpcServerCallsMetric.isPresent());
 
         Callable<Long> getPrometheusMetrics = () -> {
-            ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/prometheus"), String.class);
+            ResponseEntity<String> response = restTemplate.getForEntity("/actuator/prometheus", String.class);
             assertEquals(HttpStatus.OK, response.getStatusCode());
             return Stream.of(response.getBody().split(System.lineSeparator()))
                     .filter(s -> s.contains(metricName.replace('.', '_')))
