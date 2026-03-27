@@ -5,7 +5,6 @@ import io.grpc.examples.routeguide.Point;
 import io.grpc.examples.routeguide.RouteGuideGrpc;
 import io.grpc.examples.routeguide.RouteNote;
 import io.grpc.stub.StreamObserver;
-import lombok.extern.slf4j.Slf4j;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.lognet.springboot.grpc.GrpcServerTestBase;
@@ -15,7 +14,6 @@ import org.mockito.Mockito;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.util.concurrent.ListenableFuture;
 
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -25,6 +23,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.NONE;
 
 import java.util.concurrent.CompletableFuture;
@@ -34,11 +34,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-@Slf4j
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = DemoApp.class, webEnvironment = NONE)
 @ActiveProfiles("disable-security")
 public class RouteGuideDemo extends GrpcServerTestBase {
+    private static final Logger log = LoggerFactory.getLogger(RouteGuideDemo.class);
+
     @Test
     public void bidirectionalStreamingDemo() throws ExecutionException, InterruptedException, TimeoutException {
         final RouteGuideGrpc.RouteGuideStub asyncStub = RouteGuideGrpc.newStub(getChannel());

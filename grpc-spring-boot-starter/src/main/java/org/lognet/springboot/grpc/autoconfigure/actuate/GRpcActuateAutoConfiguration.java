@@ -44,6 +44,7 @@ public class GRpcActuateAutoConfiguration {
 
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnEnabledHealthIndicator("grpc")
+    @ConditionalOnBean(GRpcServicesRegistry.class)
     static class GRpcHealthHealthContributorConfiguration {
         @Bean
         @ConditionalOnMissingBean(name = "grpcHealthIndicator")
@@ -85,6 +86,7 @@ public class GRpcActuateAutoConfiguration {
 
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnAvailableEndpoint(endpoint = GrpcEndpoint.class)
+    @ConditionalOnBean(GRpcServicesRegistry.class)
     static class GrpcEndpointConfiguration {
 
         @Bean

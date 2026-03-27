@@ -80,6 +80,7 @@ dependencies {
     implementation "org.springframework.security:spring-security-config"
     implementation "org.springframework.security:spring-security-oauth2-jose"
     implementation "org.springframework.security:spring-security-oauth2-resource-server"
+    implementation "org.springframework.boot:spring-boot-security"
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     compileOnly 'org.springframework:spring-tx'
 
@@ -98,12 +99,15 @@ dependencies {
     testImplementation "org.springframework.cloud:spring-cloud-config-client"
     testImplementation "org.springframework.cloud:spring-cloud-starter-bootstrap"
 
-    testImplementation "com.playtika.testcontainers:embedded-keycloak:3.1.11"
+    testImplementation "com.github.dasniko:testcontainers-keycloak:3.7.0"
     testImplementation "com.playtika.testcontainers:embedded-consul:3.1.11"
 
 
+    testImplementation 'org.springframework.security:spring-security-core'
+    testImplementation "org.springframework.boot:spring-boot-security"
+    testImplementation "org.springframework.boot:spring-boot-security-oauth2-resource-server"
+    testImplementation "org.springframework.boot:spring-boot-validation"
     testImplementation 'org.hamcrest:hamcrest:2.2'
-    testImplementation 'org.mockito:mockito-core:2.23.0'
 
 
     pureNettyTestImplementation "io.grpc:grpc-netty"
@@ -119,7 +123,6 @@ dependencies {
     reactiveTestImplementation 'org.postgresql:postgresql'
     reactiveTestImplementation "com.playtika.testcontainers:embedded-postgresql:3.1.11"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
-
 
 }
 
@@ -150,10 +153,3 @@ compileTestKotlin {
         jvmTarget = JavaVersion.VERSION_17
     }
 }
-
-
-
-
-
-
-
