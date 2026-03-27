@@ -1,6 +1,11 @@
 package org.lognet.springboot.grpc.actuator;
 
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.TypeRef;
+import com.jayway.jsonpath.spi.json.GsonJsonProvider;
+import com.jayway.jsonpath.spi.mapper.GsonMappingProvider;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import org.awaitility.Awaitility;
 import org.hamcrest.Matchers;
@@ -18,9 +23,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Duration;
-import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
@@ -49,8 +57,12 @@ public class ActuatorTest extends GrpcServerTestBase {
     @LocalServerPort
     private int localServerPort;
 
-    private RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate = new RestTemplate();
 
+    private final Configuration jsonPathConfig = Configuration.builder()
+            .jsonProvider(new GsonJsonProvider())
+            .mappingProvider(new GsonMappingProvider())
+            .build();
 
     private String url(String path) {
         return "http://localhost:" + localServerPort + path;
@@ -63,43 +75,52 @@ public class ActuatorTest extends GrpcServerTestBase {
     }
 
     @Test
-    public void actuatorGrpcTest() throws Exception {
+    public void actuatorGrpcTest() throws ExecutionException, InterruptedException {
         ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/grpc"), String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
-        List<String> serviceNames = JsonPath.read(response.getBody(), "$.services[*].name");
-        assertThat(serviceNames.size(), Matchers.greaterThan(0));
-        serviceNames.forEach(name -> assertThat(name, Matchers.not(Matchers.blankOrNullString())));
+        final DocumentContext json = JsonPath.parse(response.getBody(), jsonPathConfig);
+        final String[] serviceNames = json.read("services.*name", new TypeRef<String[]>() {});
+        assertThat(serviceNames, Matchers.arrayWithSize(Matchers.greaterThan(0)));
+        for (String name : serviceNames) {
+            assertThat(name, Matchers.not(Matchers.blankOrNullString()));
+        }
 
-        int port = JsonPath.read(response.getBody(), "$.port");
+        final Integer port = json.read("port", Integer.class);
         assertThat(port, Matchers.greaterThan(0));
     }
 
     @Test
-    public void actuatorHealthTest() throws Exception {
+    public void actuatorHealthTest() throws ExecutionException, InterruptedException {
         ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/health/grpc"), String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
-        java.util.Map<String, Object> components = JsonPath.read(response.getBody(), "$.components");
-        assertThat(components.keySet(), Matchers.containsInAnyOrder(super.appServicesNames().toArray(new String[]{})));
+        final DocumentContext json = JsonPath.parse(response.getBody(), jsonPathConfig);
+        final TypeRef<Set<String>> setOfString = new TypeRef<Set<String>>() {};
+        final Set<String> services = json.read("components.keys()", setOfString);
+        assertThat(services, Matchers.containsInAnyOrder(super.appServicesNames().toArray(new String[]{})));
 
-        List<String> statuses = JsonPath.read(response.getBody(), "$.components.*.status");
-        assertThat(statuses, Matchers.everyItem(Matchers.is(Status.UP.getCode())));
+        final Set<String> statuses = json.read("components.*status", setOfString);
+        assertThat(statuses, Matchers.contains(Status.UP.getCode()));
     }
 
     @Override
     protected void afterGreeting() throws Exception {
 
-        ResponseEntity<String> metricsResponse = restTemplate.getForEntity(url("/actuator/metrics"), String.class);
+        ResponseEntity<ObjectNode> metricsResponse = restTemplate.getForEntity(url("/actuator/metrics"), ObjectNode.class);
         assertEquals(HttpStatus.OK, metricsResponse.getStatusCode());
         final String metricName = "grpc.server.calls";
-        List<String> metricNames = JsonPath.read(metricsResponse.getBody(), "$.names");
-        assertThat("Should contain " + metricName, metricNames.contains(metricName));
+        final Optional<String> containsGrpcServerCallsMetric = metricsResponse.getBody().withArray("names")
+                .valueStream()
+                .map(JsonNode::asText)
+                .filter(metricName::equals)
+                .findFirst();
+        assertThat("Should contain " + metricName, containsGrpcServerCallsMetric.isPresent());
 
         Callable<Long> getPrometheusMetrics = () -> {
-            ResponseEntity<String> prometheusResponse = restTemplate.getForEntity(url("/actuator/prometheus"), String.class);
-            assertEquals(HttpStatus.OK, prometheusResponse.getStatusCode());
-            return Stream.of(prometheusResponse.getBody().split(System.lineSeparator()))
+            ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/prometheus"), String.class);
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            return Stream.of(response.getBody().split(System.lineSeparator()))
                     .filter(s -> s.contains(metricName.replace('.', '_')))
                     .count();
         };
