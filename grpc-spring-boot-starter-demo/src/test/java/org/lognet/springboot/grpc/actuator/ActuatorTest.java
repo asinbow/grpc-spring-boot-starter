@@ -1,8 +1,6 @@
 package org.lognet.springboot.grpc.actuator;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
+import com.jayway.jsonpath.JsonPath;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import org.awaitility.Awaitility;
 import org.hamcrest.Matchers;
@@ -22,8 +20,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
-import java.util.Optional;
-import java.util.Set;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
@@ -69,13 +66,12 @@ public class ActuatorTest extends GrpcServerTestBase {
     public void actuatorGrpcTest() throws Exception {
         ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/grpc"), String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        final JsonNode json = new ObjectMapper().readTree(response.getBody());
-        final JsonNode services = json.get("services");
-        assertThat(services.size(), Matchers.greaterThan(0));
-        for (JsonNode service : services) {
-            assertThat(service.get("name").asText(), Matchers.not(Matchers.blankOrNullString()));
-        }
-        final int port = json.get("port").asInt();
+
+        List<String> serviceNames = JsonPath.read(response.getBody(), "$.services[*].name");
+        assertThat(serviceNames.size(), Matchers.greaterThan(0));
+        serviceNames.forEach(name -> assertThat(name, Matchers.not(Matchers.blankOrNullString())));
+
+        int port = JsonPath.read(response.getBody(), "$.port");
         assertThat(port, Matchers.greaterThan(0));
     }
 
@@ -84,36 +80,26 @@ public class ActuatorTest extends GrpcServerTestBase {
         ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/health/grpc"), String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
-        final JsonNode json = new ObjectMapper().readTree(response.getBody());
-        final JsonNode components = json.get("components");
-        final Set<String> services = new java.util.HashSet<>();
-        final Set<String> statuses = new java.util.HashSet<>();
-        services.addAll(components.propertyNames());
-        components.forEach(component -> statuses.add(component.get("status").asText()));
+        java.util.Map<String, Object> components = JsonPath.read(response.getBody(), "$.components");
+        assertThat(components.keySet(), Matchers.containsInAnyOrder(super.appServicesNames().toArray(new String[]{})));
 
-        assertThat(services, Matchers.containsInAnyOrder(super.appServicesNames().toArray(new String[]{})));
-        assertThat(statuses, Matchers.contains(Status.UP.getCode()));
+        List<String> statuses = JsonPath.read(response.getBody(), "$.components.*.status");
+        assertThat(statuses, Matchers.everyItem(Matchers.is(Status.UP.getCode())));
     }
 
     @Override
     protected void afterGreeting() throws Exception {
 
-
-        ResponseEntity<ObjectNode> metricsResponse = restTemplate.getForEntity(url("/actuator/metrics"), ObjectNode.class);
+        ResponseEntity<String> metricsResponse = restTemplate.getForEntity(url("/actuator/metrics"), String.class);
         assertEquals(HttpStatus.OK, metricsResponse.getStatusCode());
         final String metricName = "grpc.server.calls";
-        final Optional<String> containsGrpcServerCallsMetric = metricsResponse.getBody().withArray("names")
-                .valueStream()
-                .map(JsonNode::asText)
-                .filter(metricName::equals)
-                .findFirst();
-        assertThat("Should contain " + metricName, containsGrpcServerCallsMetric.isPresent());
-
+        List<String> metricNames = JsonPath.read(metricsResponse.getBody(), "$.names");
+        assertThat("Should contain " + metricName, metricNames.contains(metricName));
 
         Callable<Long> getPrometheusMetrics = () -> {
-            ResponseEntity<String> response = restTemplate.getForEntity(url("/actuator/prometheus"), String.class);
-            assertEquals(HttpStatus.OK, response.getStatusCode());
-            return Stream.of(response.getBody().split(System.lineSeparator()))
+            ResponseEntity<String> prometheusResponse = restTemplate.getForEntity(url("/actuator/prometheus"), String.class);
+            assertEquals(HttpStatus.OK, prometheusResponse.getStatusCode());
+            return Stream.of(prometheusResponse.getBody().split(System.lineSeparator()))
                     .filter(s -> s.contains(metricName.replace('.', '_')))
                     .count();
         };

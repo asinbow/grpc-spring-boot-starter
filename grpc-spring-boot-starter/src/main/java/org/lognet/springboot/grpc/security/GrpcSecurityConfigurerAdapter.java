@@ -39,9 +39,7 @@ public abstract class GrpcSecurityConfigurerAdapter extends GrpcSecurityConfigur
     @Override
     public void init(GrpcSecurity builder) {
         GrpcServiceAuthorizationConfigurer authConfigurer = new GrpcServiceAuthorizationConfigurer(builder.getApplicationContext().getBean(GRpcServicesRegistry.class));
-        builder.apply(authConfigurer);
-        // Spring Security 7+ no longer calls setBuilder() in apply(), only in with().
-        authConfigurer.setBuilder(builder);
+        builder.with(authConfigurer);
         builder.setSharedObject(AuthenticationManagerBuilder.class, authenticationManagerBuilder);
         final AuthenticationSchemeService authenticationSchemeService = new AuthenticationSchemeService();
 

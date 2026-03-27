@@ -61,7 +61,7 @@ public abstract class ConfigServerEnvironmentBaseTest extends GrpcServerTestBase
         server = SpringApplication.run(ConfigServerTestApplication.class,
                 "--server.port=" + configPort,
                 "--spring.autoconfigure.exclude="+Stream.of(
-                        "org.springframework.boot.security.autoconfigure.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration",
+                        "org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration",
                         "org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration"
                 ).collect(Collectors.joining(",")),
                 "--spring.cloud.consul.discovery.enabled=false",

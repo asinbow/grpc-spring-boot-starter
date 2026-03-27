@@ -14,7 +14,6 @@ import org.springframework.security.authorization.method.PreAuthorizeAuthorizati
 import org.springframework.security.config.ObjectPostProcessor;
 import org.springframework.security.config.annotation.AbstractConfiguredSecurityBuilder;
 import org.springframework.security.config.annotation.SecurityBuilder;
-import org.springframework.security.config.annotation.SecurityConfigurerAdapter;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -33,8 +32,12 @@ public class GrpcSecurity extends AbstractConfiguredSecurityBuilder<ServerInterc
     }
 
     public GrpcServiceAuthorizationConfigurer.Registry authorizeRequests() {
-        return getOrApply(new GrpcServiceAuthorizationConfigurer(applicationContext.getBean(GRpcServicesRegistry.class)))
-                .getRegistry();
+        GrpcServiceAuthorizationConfigurer configurer = getConfigurer(GrpcServiceAuthorizationConfigurer.class);
+        if (configurer == null) {
+            configurer = new GrpcServiceAuthorizationConfigurer(applicationContext.getBean(GRpcServicesRegistry.class));
+            with(configurer);
+        }
+        return configurer.getRegistry();
     }
 
     public GrpcSecurity userDetailsService(UserDetailsService userDetailsService) {
@@ -105,19 +108,6 @@ public class GrpcSecurity extends AbstractConfiguredSecurityBuilder<ServerInterc
                 .orElse(null);
         securityInterceptor.setConfig(authCfg);
         return securityInterceptor;
-    }
-
-    @SuppressWarnings("unchecked")
-    private <C extends SecurityConfigurerAdapter<ServerInterceptor, GrpcSecurity>> C getOrApply(C configurer) {
-        C existingConfig = (C) getConfigurer(configurer.getClass());
-        if (existingConfig != null) {
-            return existingConfig;
-        }
-        C applied = apply(configurer);
-        // Spring Security 7+ no longer calls setBuilder() in apply(), only in with().
-        // Call setBuilder() explicitly so that configurer.getBuilder() works immediately.
-        applied.setBuilder(this);
-        return applied;
     }
 
     private AuthenticationManagerBuilder getAuthenticationRegistry() {
