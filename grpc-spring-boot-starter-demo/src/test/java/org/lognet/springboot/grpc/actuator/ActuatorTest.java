@@ -58,10 +58,6 @@ public class ActuatorTest extends GrpcServerTestBase {
     @Autowired
     private TestRestTemplate restTemplate;
 
-    private final Configuration jsonPathConfig = Configuration.builder()
-            .jsonProvider(new GsonJsonProvider())
-            .mappingProvider(new GsonMappingProvider())
-            .build();
 
     @Test
     public void actuatorEnvTest() throws ExecutionException, InterruptedException {
@@ -73,16 +69,18 @@ public class ActuatorTest extends GrpcServerTestBase {
     public void actuatorGrpcTest() throws ExecutionException, InterruptedException {
         ResponseEntity<String> response = restTemplate.getForEntity("/actuator/grpc", String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
-
-        final DocumentContext json = JsonPath.parse(response.getBody(), jsonPathConfig);
-        final String[] serviceNames = json.read("services.*name", new TypeRef<String[]>() {});
-        assertThat(serviceNames, Matchers.arrayWithSize(Matchers.greaterThan(0)));
-        for (String name : serviceNames) {
-            assertThat(name, Matchers.not(Matchers.blankOrNullString()));
+        final DocumentContext json = JsonPath.parse(response.getBody(), Configuration.builder()
+                .mappingProvider(new GsonMappingProvider())
+                .jsonProvider(new GsonJsonProvider())
+                .build());
+        final String[] statuses = json.read("services.*name", new TypeRef<String[]>() {});
+        assertThat(statuses,Matchers.arrayWithSize(Matchers.greaterThan(0)));
+        for(String s:statuses) {
+            assertThat(s, Matchers.not(Matchers.blankOrNullString()));
         }
 
         final Integer port = json.read("port", Integer.class);
-        assertThat(port, Matchers.greaterThan(0));
+        assertThat(port,Matchers.greaterThan(0));
     }
 
     @Test
@@ -90,27 +88,36 @@ public class ActuatorTest extends GrpcServerTestBase {
         ResponseEntity<String> response = restTemplate.getForEntity("/actuator/health/grpc", String.class);
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
-        final DocumentContext json = JsonPath.parse(response.getBody(), jsonPathConfig);
-        final TypeRef<Set<String>> setOfString = new TypeRef<Set<String>>() {};
+        final DocumentContext json = JsonPath.parse(response.getBody(), Configuration.builder()
+                        .mappingProvider(new GsonMappingProvider())
+                        .jsonProvider(new GsonJsonProvider())
+                .build());
+        final TypeRef<Set<String>> setOfString = new TypeRef<Set<String>>() {
+        };
         final Set<String> services = json.read("components.keys()", setOfString);
-        assertThat(services, Matchers.containsInAnyOrder(super.appServicesNames().toArray(new String[]{})));
+        assertThat(services,Matchers.containsInAnyOrder( super.appServicesNames().toArray(new String[]{})));
 
         final Set<String> statuses = json.read("components.*status", setOfString);
-        assertThat(statuses, Matchers.contains(Status.UP.getCode()));
+        assertThat(statuses,Matchers.contains(Status.UP.getCode()));
+
+
+
     }
 
     @Override
     protected void afterGreeting() throws Exception {
 
+
         ResponseEntity<ObjectNode> metricsResponse = restTemplate.getForEntity("/actuator/metrics", ObjectNode.class);
         assertEquals(HttpStatus.OK, metricsResponse.getStatusCode());
         final String metricName = "grpc.server.calls";
         final Optional<String> containsGrpcServerCallsMetric = metricsResponse.getBody().withArray("names")
-                .valueStream()
+                .elements().stream()
                 .map(JsonNode::asText)
                 .filter(metricName::equals)
                 .findFirst();
         assertThat("Should contain " + metricName, containsGrpcServerCallsMetric.isPresent());
+
 
         Callable<Long> getPrometheusMetrics = () -> {
             ResponseEntity<String> response = restTemplate.getForEntity("/actuator/prometheus", String.class);
